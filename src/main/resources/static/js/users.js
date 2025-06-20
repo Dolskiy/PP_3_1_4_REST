@@ -250,26 +250,24 @@ document.getElementById('editUserForm').addEventListener('submit', function (eve
 });
 
 function openDeleteUserPopup(userId) {
-    if (confirm('Вы уверены, что хотите удалить этого пользователя?')) {
-        console.log('Deleting user ID:', userId);
-        fetch(`/admin/users/${userId}`, {
-            method: 'DELETE'
+    console.log('Deleting user ID:', userId);
+    fetch(`/admin/users/${userId}`, {
+        method: 'DELETE'
+    })
+        .then(response => {
+            if (response.ok) {
+                fetchUsers();
+                console.log('User deleted successfully');
+            } else {
+                return response.json().then(data => {
+                    throw new Error(data.message || 'Failed to delete user');
+                });
+            }
         })
-            .then(response => {
-                if (response.ok) {
-                    fetchUsers();
-                    alert('Пользователь успешно удалён!');
-                } else {
-                    return response.json().then(data => {
-                        throw new Error(data.message || 'Не удалось удалить пользователя');
-                    });
-                }
-            })
-            .catch(error => {
-                console.error('Error deleting user:', error);
-                alert('Ошибка при удалении пользователя: ' + error.message);
-            });
-    }
+        .catch(error => {
+            console.error('Error deleting user:', error);
+            alert('Error deleting user: ' + error.message);
+        });
 }
 
 function openModal(modalId) {
