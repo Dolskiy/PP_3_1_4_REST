@@ -2,89 +2,25 @@ document.addEventListener('DOMContentLoaded', function () {
     fetchCurrentUser();
     fetchUsers();
     loadRoles();
-    setupCloseButtons();
 });
 
 function fetchCurrentUser() {
-    console.log('Fetching current user info...');
     fetch('/admin/currentUser')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to fetch current user info');
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(user => {
-            console.log('Current user fetched:', user);
-            const emailSpan = document.getElementById('currentUserEmail');
-            const roleSpan = document.getElementById('currentUserRole');
-            emailSpan.textContent = user.email;
-            roleSpan.textContent = user.roles.map(role => role.name).join(', '); // Преобразуем массив ролей в строку
+            document.getElementById('currentUserEmail').textContent = user.email;
+            document.getElementById('currentUserRole').textContent = user.roles.map(role => role.name).join(', ');
         })
-        .catch(error => {
-            console.error('Error fetching current user info:', error);
-        });
-}
-
-fetch('/admin/currentUser')
-    .then(r => r.json())
-    .then(data => userTable(data))
-
-const userInfoAdmin = document.getElementById('about-user')
-let userInfoOutput = '';
-const userTable = (user) => {
-    role = '';
-    if (user.roles) {
-        user.roles.forEach((r) => role += r.name.substring(5) + " ");
-    }
-    userInfoOutput = `
-        <tr>
-            <td>${user.id}</td>
-            <td>${user.firstName}</td>
-            <td>${user.lastName}</td>
-            <td>${user.age}</td>
-            <td>${user.email}</td>
-         
-            <td>${role}</td>
-        </tr>
-     `
-    userInfoAdmin.innerHTML = userInfoOutput;
-}
-
-function loadRoles() {
-    const xhr = new XMLHttpRequest();
-    xhr.open('GET', rolesListUrl);
-    xhr.onreadystatechange = () => {
-        if (xhr.readyState === XMLHttpRequest.DONE) {
-            if (xhr.status === 200) {
-                const data = JSON.parse(xhr.responseText);
-                let options = '';
-                for (const {id, name} of data) {
-                    options += `<option value="${id}">${name}</option>`;
-                }
-                selectRoleForm.innerHTML = options;
-            } else {
-                console.error('Error:', xhr.status);
-            }
-        }
-    };
-    xhr.send();
+        .catch(error => console.error('Error:', error));
 }
 
 function fetchUsers() {
-    console.log('Fetching users...');
     fetch('/admin/users')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to fetch users');
-            }
-            return response.json();
-        })
-        .then(response => {
-            console.log('Users fetched:', response);
+        .then(response => response.json())
+        .then(users => {
             const tableBody = document.getElementById('users-table-body');
             tableBody.innerHTML = '';
-            response.forEach(user => {
+            users.forEach(user => {
                 const row = document.createElement('tr');
                 row.innerHTML = `
                     <td>${user.id}</td>
@@ -92,225 +28,131 @@ function fetchUsers() {
                     <td>${user.lastName}</td>
                     <td>${user.age}</td>
                     <td>${user.email}</td>
-                    
-                    <td>${user.roles.map(role => role.name).join(', ')}</td> 
-                    <td><button class="btn btn-info" onclick="openEditUserPopup(${user.id})">Edit</button></td>
-                    <td><button class="btn btn-danger" onclick="openDeleteUserPopup(${user.id})">Delete</button></td>
+                    <td>${user.roles.map(role => role.name).join(', ')}</td>
+                    <td><button class="btn btn-info" onclick="editUser(${user.id})">Edit</button></td>
+                    <td><button class="btn btn-danger" onclick="deleteUser(${user.id})">Delete</button></td>
                 `;
                 tableBody.appendChild(row);
             });
         })
-        .catch(error => {
-            console.error('Error fetching users:', error);
-            alert('Ошибка при загрузке пользователей');
-        });
+        .catch(error => console.error('Error:', error));
 }
 
 function loadRoles() {
-    console.log('Loading roles...');
     fetch('/admin/users/roles')
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to fetch roles');
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(roles => {
-            console.log('Roles fetched:', roles);
             const roleSelect = document.getElementById('roles');
             const editRoleSelect = document.getElementById('editRoles');
+
             roleSelect.innerHTML = '';
             editRoleSelect.innerHTML = '';
+
             roles.forEach(role => {
                 const option = document.createElement('option');
                 option.value = role.id;
-                option.text = role.authority;
-                roleSelect.appendChild(option);
-                const editOption = document.createElement('option');
-                editOption.value = role.id;
-                editOption.text = role.authority;
-                editRoleSelect.appendChild(editOption);
+                option.textContent = role.name;
+                roleSelect.appendChild(option.cloneNode(true));
+                editRoleSelect.appendChild(option);
             });
         })
-        .catch(error => {
-            console.error('Error loading roles:', error);
-            alert('Ошибка при загрузке ролей');
-        });
+        .catch(error => console.error('Error:', error));
 }
 
-document.getElementById('new-user-form').addEventListener('submit', function (event) {
-    event.preventDefault();
-    const formData = new FormData(this);
-    const rolesSelected = Array.from(document.getElementById('roles').selectedOptions).map(option => ({
-        id: parseInt(option.value, 10)
-    }));
-    const user = {
-        firstName: formData.get('firstName'),
-        lastName: formData.get('lastName'),
-        age: parseInt(formData.get('age'), 10),
-        email: formData.get('email'),
-        password: formData.get('password'),
-        roles: rolesSelected
-    };
-    console.log('Creating user:', user);
-    fetch('/admin/users', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(user)
-    })
-        .then(response => {
-            if (response.ok) {
-                fetchUsers();
-                alert('Пользователь успешно создан!');
-                this.reset();
-                closeModal('newUserPopup');
-            } else {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Не удалось создать пользователя');
-                });
-            }
-        })
-        .catch(error => {
-            console.error('Error creating user:', error);
-            alert('Ошибка при создании пользователя: ' + error.message);
-        });
-});
-
-function openEditUserPopup(userId) {
-    console.log('Opening edit modal for user ID:', userId);
+function editUser(userId) {
     fetch(`/admin/users/${userId}`)
-        .then(response => {
-            if (!response.ok) {
-                throw new Error('Failed to fetch user');
-            }
-            return response.json();
-        })
+        .then(response => response.json())
         .then(user => {
-            console.log('User fetched for edit:', user);
             document.getElementById('editUserId').value = user.id;
             document.getElementById('editFirstName').value = user.firstName;
             document.getElementById('editLastName').value = user.lastName;
             document.getElementById('editAge').value = user.age;
             document.getElementById('editEmail').value = user.email;
-            document.getElementById('password').value = user.password;
+
             const editRolesSelect = document.getElementById('editRoles');
             Array.from(editRolesSelect.options).forEach(option => {
-                option.selected = user.roles.some(role => role.id === parseInt(option.value, 10));
+                option.selected = user.roles.some(role => role.id === parseInt(option.value));
             });
-            openModal('editUserModal');
+
+            document.getElementById('editFormContainer').style.display = 'block';
+            window.scrollTo(0, document.body.scrollHeight);
         })
-        .catch(error => {
-            console.error('Error fetching user:', error);
-            alert('Ошибка при загрузке данных пользователя');
-        });
+        .catch(error => console.error('Error:', error));
 }
 
-document.getElementById('editUserForm').addEventListener('submit', function (event) {
-    event.preventDefault();
+function deleteUser(userId) {
+    if (confirm('Are you sure you want to delete this user?')) {
+        fetch(`/admin/users/${userId}`, { method: 'DELETE' })
+            .then(response => {
+                if (response.ok) {
+                    fetchUsers();
+                }
+            })
+            .catch(error => console.error('Error:', error));
+    }
+}
+
+function cancelEdit() {
+    document.getElementById('editFormContainer').style.display = 'none';
+    document.getElementById('editUserForm').reset();
+}
+
+document.getElementById('new-user-form').addEventListener('submit', function (e) {
+    e.preventDefault();
     const formData = new FormData(this);
-    const userId = parseInt(formData.get('id'), 10);
-    const rolesSelected = Array.from(document.getElementById('editRoles').selectedOptions).map(option => ({
-        id: parseInt(option.value, 10)
-    }));
+    const roles = Array.from(document.getElementById('roles').selectedOptions)
+        .map(option => ({ id: parseInt(option.value) }));
+
     const user = {
-        id: userId,
-        firstName: formData.get('editFirstName'),
-        lastName: formData.get('editLastName'),
-        age: parseInt(formData.get('editAge'), 10),
-        email: formData.get('editEmail'),
-        password: formData.get(('editPassword')),
-        roles: rolesSelected
+        firstName: formData.get('firstName'),
+        lastName: formData.get('lastName'),
+        age: parseInt(formData.get('age')),
+        email: formData.get('email'),
+        password: formData.get('password'),
+        roles: roles
     };
-    console.log('Updating user:', user);
-    fetch(`/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        },
+
+    fetch('/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(user)
     })
         .then(response => {
             if (response.ok) {
+                this.reset();
                 fetchUsers();
-                alert('Пользователь успешно обновлен!');
-                closeModal('editUserModal');
-            } else {
-                return response.json().then(data => {
-                    console.error('Ошибка обновления:', data);
-                    alert('Ошибка при обновлении пользователя: ' + data.message);
-                });
             }
         })
-        .catch(error => {
-            console.error('Error updating user:', error);
-            alert('Ошибка при обновлении пользователя: ' + error.message);
-        });
+        .catch(error => console.error('Error:', error));
 });
 
-function openDeleteUserPopup(userId) {
-    console.log('Deleting user ID:', userId);
-    fetch(`/admin/users/${userId}`, {
-        method: 'DELETE'
+document.getElementById('editUserForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    const formData = new FormData(this);
+    const roles = Array.from(document.getElementById('editRoles').selectedOptions)
+        .map(option => ({ id: parseInt(option.value) }));
+
+    const user = {
+        id: parseInt(formData.get('id')),
+        firstName: formData.get('editFirstName'),
+        lastName: formData.get('editLastName'),
+        age: parseInt(formData.get('editAge')),
+        email: formData.get('editEmail'),
+        password: formData.get('editPassword') || undefined,
+        roles: roles
+    };
+
+    fetch(`/admin/users/${user.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(user)
     })
         .then(response => {
             if (response.ok) {
+                this.reset();
+                document.getElementById('editFormContainer').style.display = 'none';
                 fetchUsers();
-                console.log('User deleted successfully');
-            } else {
-                return response.json().then(data => {
-                    throw new Error(data.message || 'Failed to delete user');
-                });
             }
         })
-        .catch(error => {
-            console.error('Error deleting user:', error);
-            alert('Error deleting user: ' + error.message);
-        });
-}
-
-function openModal(modalId) {
-    console.log('Opening modal:', modalId);
-    const modal = document.getElementById(modalId);
-    const overlay = document.getElementById('overlay');
-    if (modal && overlay) {
-        modal.style.display = 'block';
-        overlay.style.display = 'block';
-        document.body.style.overflow = 'hidden';
-    }
-}
-
-function closeModal(modalId) {
-    console.log('Closing modal:', modalId);
-    const modal = document.getElementById(modalId);
-    const overlay = document.getElementById('overlay');
-    if (modal && overlay) {
-        modal.style.display = 'none';
-        overlay.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    }
-}
-
-function setupCloseButtons() {
-    const closeButtons = document.querySelectorAll('.close-popup');
-    closeButtons.forEach(button => {
-        button.addEventListener('click', function (event) {
-            event.preventDefault();
-            const modalId = this.getAttribute('data-modal');
-            if (modalId) {
-                closeModal(modalId);
-            }
-        });
-    });
-
-    const overlay = document.getElementById('overlay');
-    overlay.addEventListener('click', function () {
-        const modals = document.querySelectorAll('.popup');
-        modals.forEach(modal => {
-            modal.style.display = 'none';
-        });
-        this.style.display = 'none';
-        document.body.style.overflow = 'auto';
-    });
-}
+        .catch(error => console.error('Error:', error));
+});
